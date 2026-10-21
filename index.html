@@ -202,6 +202,19 @@ dialog{border-radius:32px;padding:28px}dialog h2{font-size:24px;letter-spacing:-
  #side,#panel,.bar,.dock,.card-d,.composer,.tip,.ctx,dialog{background:var(--gp1)}}
 @media (prefers-reduced-transparency:reduce){#side,#panel,.bar,.dock,.card-d,.composer,.tip,.ctx,dialog{background:var(--gp1);-webkit-backdrop-filter:none;backdrop-filter:none}body::before{display:none}}
 @media (prefers-reduced-motion:reduce){body::before{animation:none}}
+
+/* ---- Administración ---- */
+.adm-btn{display:flex;align-items:center;gap:8px;border:0;background:none;color:var(--muted);font-size:12.5px;font-weight:500;padding:8px 12px;border-radius:999px;opacity:.6;transition:.2s var(--ease)}
+.adm-btn:hover{opacity:1;background:var(--soft)}body.admin .adm-btn{opacity:1;color:var(--green)}
+.admbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 18px;margin-bottom:22px;border-radius:22px;background:color-mix(in srgb,var(--green) 14%,transparent);border:1px solid color-mix(in srgb,var(--green) 35%,transparent);font-size:13.5px}
+.admbar[hidden]{display:none}.admbar span{color:var(--muted);flex:1;min-width:200px}
+.cw{display:flex;flex-direction:column;gap:10px;min-width:0}.cw .card-d{display:block;width:100%}
+.cw:nth-child(2) .card-d{animation-delay:.06s}.cw:nth-child(3) .card-d{animation-delay:.12s}.cw:nth-child(n+4) .card-d{animation-delay:.18s}
+.actl{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:0 6px}
+.vs{display:inline-block;margin-left:4px;padding:0 8px;border-radius:999px;font-size:10.5px;font-weight:700;background:color-mix(in srgb,var(--amber) 24%,transparent);color:#b36f00}
+.nav .vs{margin-left:auto}.nav .vs+.dot{margin-left:6px}
+@media (prefers-color-scheme:dark){.vs{color:var(--amber)}}
+.shake{animation:shake .3s}@keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
 </style>
 </head>
 <body class="home">
@@ -211,12 +224,14 @@ dialog{border-radius:32px;padding:28px}dialog h2{font-size:24px;letter-spacing:-
  <div class="lbl">Documentos <button class="btn sm" id="add">+ Enlace</button></div>
  <div id="docList"></div>
  <button class="me" id="who"></button>
+ <button class="adm-btn" id="admBtn"></button>
 </aside>
 
 <section id="home">
  <button class="btn mob" id="oSide1" style="margin-bottom:16px">Menú</button>
  <h1>Documentos para revisar</h1>
  <p class="s">Abre un documento y deja tus comentarios exactamente donde importan.</p>
+ <div class="admbar" id="admBar" hidden><b>Modo administrador</b><span>Los cambios se ven en este navegador. Para publicarlos para todos, exporta la configuración.</span><button class="btn sm" id="admExp">Exportar configuración</button></div>
  <div class="grid" id="grid"></div>
 </section>
 
@@ -247,6 +262,7 @@ dialog{border-radius:32px;padding:28px}dialog h2{font-size:24px;letter-spacing:-
 <button id="selBtn" hidden>Comentar selección</button>
 <dialog id="nameDlg"><h2>¿Cómo te llamas?</h2><p>Tu nombre aparecerá junto a cada comentario.</p><input id="nameIn" maxlength="40" placeholder="Nombre y apellido" autocomplete="name"><div class="row"><button class="btn primary" id="nameOk">Empezar a revisar</button></div></dialog>
 <dialog id="addDlg"><h2>Añadir documento</h2><p>Pega un enlace a un PDF, imagen, Google Docs / Slides / Drive u otra web.</p><input id="addT" placeholder="Título del documento"><input id="addU" placeholder="https://…" inputmode="url"><div class="row"><button class="btn" id="addNo">Cancelar</button><button class="btn primary" id="addOk">Añadir</button></div></dialog>
+<dialog id="admDlg"><h2>Acceso de administrador</h2><p>Introduce la contraseña para gestionar los documentos.</p><input id="admPw" type="password" inputmode="numeric" autocomplete="current-password" placeholder="Contraseña"><div class="row"><button class="btn" id="admNo">Cancelar</button><button class="btn primary" id="admOk">Entrar</button></div></dialog>
 <div class="toast" id="toast" role="status"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -257,6 +273,8 @@ const DOCS = [
   // { id:'brochure-v2', title:'Brochure v2', url:'docs/brochure-v2.pdf' },
   // { id:'logo', title:'Propuesta de logo', url:'img/logo.png' },
   // { id:'deck', title:'Presentación', url:'https://docs.google.com/presentation/d/XXXX/edit' },
+  // Visibilidad: vis:'public' (todos) | 'link' (solo con ?doc=ID&k=CLAVE) | 'hidden' (solo admin)
+  // { id:'cliente-x', title:'Propuesta privada', url:'docs/propuesta.pdf', vis:'link', key:'abc12345' },
 ];
 /* ============================================================================ */
 const $=s=>document.querySelector(s);
@@ -264,7 +282,13 @@ const store={get(k,d){try{const v=localStorage.getItem('rv.'+k);return v===null?
 const norm=c=>{c.status=c.status||(c.done?'applied':'open');delete c.done;c.replies=c.replies||[];return c};
 let extra=store.get('extra',[]),comments=store.get('comments',[]).map(norm),approved=store.get('approved',{}),user=store.get('user',''),
     designer=store.get('designer',false),zoom=store.get('zoom',820),cur=null,commenting=false,tab='fb',tok=0,activeId=null,pendSel=null;
-const all=()=>[...DOCS,...extra];
+const adm=store.get('adm',{vis:{},removed:[],keys:{}});let admin=false;try{admin=sessionStorage.getItem('rv.admin')==='1'}catch{}
+const myKeys=store.get('keys',[]);
+(()=>{const k=new URLSearchParams(location.search).get('k');if(k&&!myKeys.includes(k)){myKeys.push(k);store.set('keys',myKeys)}})();
+const eff=d=>({...d,vis:adm.vis[d.id]||d.vis||'public',key:adm.keys[d.id]||d.key||''});
+const allRaw=()=>[...DOCS.filter(d=>!adm.removed.includes(d.id)),...extra].map(eff);
+const visible=d=>admin||d.vis==='public'||(d.vis==='link'&&d.key&&myKeys.includes(d.key));
+const all=()=>allRaw().filter(visible);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const typeOf=u=>/\.pdf($|[?#])/i.test(u)?'pdf':/\.(png|jpe?g|gif|webp|svg|avif)($|[?#])/i.test(u)?'img':'embed';
 const embedUrl=u=>u.replace(/(drive\.google\.com\/file\/d\/[^/]+)\/view.*/,'$1/preview').replace(/(docs\.google\.com\/(?:document|presentation|spreadsheets)\/d\/[^/]+)\/(?:edit|view).*/,'$1/preview');
@@ -280,13 +304,15 @@ const nOpen=id=>comments.filter(c=>c.doc===id&&c.status==='open'&&c.kind!=='ok')
 const statTag=id=>approved[id]?'<span class="tag appr">Aprobado</span>':nOpen(id)?`<span class="tag open">${nOpen(id)} pendiente${nOpen(id)>1?'s':''}</span>`:'<span class="tag">Sin cambios</span>';
 
 /* ---------- Inicio y lista ---------- */
+const vsTag=d=>admin&&d.vis!=='public'?`<small class="vs">${d.vis==='hidden'?'Oculto':'Enlace'}</small>`:'';
+const adminCtl=d=>`<div class="actl" data-id="${esc(d.id)}"><select data-adm="vis" aria-label="Visibilidad"><option value="public" ${d.vis==='public'?'selected':''}>Público</option><option value="link" ${d.vis==='link'?'selected':''}>Solo con enlace</option><option value="hidden" ${d.vis==='hidden'?'selected':''}>Oculto</option></select>${d.vis==='link'?'<button class="btn sm" data-adm="copy">Copiar enlace</button>':''}<button class="btn sm" data-adm="del">Eliminar</button></div>`;
 function renderDocs(){
   $('#goHome').classList.toggle('sel',!cur);
-  $('#docList').innerHTML=all().map(d=>`<button class="nav ${d.id===cur?'sel':''}" data-id="${esc(d.id)}"><span class="t">${esc(d.title)}</span><span class="dot ${approved[d.id]?'ok':nOpen(d.id)?'open':''}"></span></button>`).join('');
+  $('#docList').innerHTML=all().map(d=>`<button class="nav ${d.id===cur?'sel':''}" data-id="${esc(d.id)}"><span class="t">${esc(d.title)}</span>${vsTag(d)}<span class="dot ${approved[d.id]?'ok':nOpen(d.id)?'open':''}"></span></button>`).join('');
 }
 function renderHome(){
   $('#grid').innerHTML=all().map(d=>{const t=typeOf(d.url),n=comments.filter(c=>c.doc===d.id).length;
-    return `<button class="card-d" data-id="${esc(d.id)}"><div class="th">${t==='img'?`<img src="${esc(d.url)}" alt="">`:'<div class="sheet"><i></i><i></i><i></i><i style="width:60%"></i></div>'}<span class="tag tg">${t==='embed'?'Web':t.toUpperCase()}</span></div><div class="cm"><b>${esc(d.title)}</b><small>${n} comentario${n===1?'':'s'}</small> ${statTag(d.id)}</div></button>`}).join('')
+    return `<div class="cw"><button class="card-d" data-id="${esc(d.id)}"><div class="th">${t==='img'?`<img src="${esc(d.url)}" alt="">`:'<div class="sheet"><i></i><i></i><i></i><i style="width:60%"></i></div>'}<span class="tag tg">${t==='embed'?'Web':t.toUpperCase()}</span></div><div class="cm"><b>${esc(d.title)}</b><small>${n} comentario${n===1?'':'s'}</small> ${statTag(d.id)}${vsTag(d)}</div></button>${admin?adminCtl(d):''}</div>`}).join('')
    +'<button class="card-d new" id="newCard">+ Añadir documento</button>';
 }
 $('#grid').addEventListener('click',e=>{if(e.target.closest('#newCard'))return $('#addDlg').showModal();const b=e.target.closest('.card-d');if(b)openDoc(b.dataset.id)});
@@ -435,7 +461,7 @@ $('#list').addEventListener('keydown',e=>{
 function updApprove(){const b=$('#approve');b.hidden=!designer||!cur;b.textContent=approved[cur]?'Aprobado ✓':'Todo correcto'}
 $('#approve').onclick=()=>{approved[cur]?delete approved[cur]:approved[cur]=Date.now();save();updApprove();renderDocs();renderHome();toast(approved[cur]?'Documento marcado como correcto':'Aprobación retirada')};
 function setDesigner(v){designer=v;store.set('designer',v);$('#dsg').setAttribute('aria-pressed',v);$('#dsg').textContent=v?'Modo diseñador activo':'Modo diseñador';updApprove();renderPanel()}
-$('#dsg').onclick=()=>setDesigner(!designer);
+$('#dsg').onclick=()=>admin?setDesigner(!designer):($('#admPw').value='',$('#admDlg').showModal(),$('#admPw').focus());
 function applyZoom(){document.documentElement.style.setProperty('--w',zoom+'px');$('#zl').textContent=Math.round(zoom/820*100)+'%';store.set('zoom',zoom);fitTL()}
 $('#zi').onclick=()=>{zoom=Math.min(1640,zoom+120);applyZoom()};$('#zo').onclick=()=>{zoom=Math.max(340,zoom-120);applyZoom()};
 addEventListener('resize',fitTL);
@@ -466,12 +492,33 @@ $('#file').onchange=async e=>{
   e.target.value='';
 };
 
+/* ---------- Administrador ---------- */
+const HASH="c18a8ad752fb7e649161dcabed2d1fb96fa38265866c1e8d123ba292aa23f1de";
+const sha=async t=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t)))].map(x=>x.toString(16).padStart(2,'0')).join('');
+const saveAdm=()=>store.set('adm',adm);
+const lockSvg='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="3"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+function setAdmin(v){admin=v;try{sessionStorage.setItem('rv.admin',v?'1':'0')}catch{}
+  document.body.classList.toggle('admin',v);$('#admBar').hidden=!v;$('#admBtn').innerHTML=lockSvg+(v?'Admin activo · Salir':'Admin');
+  setDesigner(v);if(cur&&!all().some(d=>d.id===cur))goHome();else{renderDocs();renderHome()}}
+$('#admBtn').onclick=()=>admin?(setAdmin(false),toast('Sesión de administrador cerrada')):($('#admPw').value='',$('#admDlg').showModal(),$('#admPw').focus());
+async function admLogin(){let ok=false;try{ok=(await sha($('#admPw').value.trim()))===HASH}catch{toast('Abre la web por https para iniciar sesión');return}
+  if(ok){$('#admDlg').close();setAdmin(true);toast('Modo administrador activado')}
+  else{const i=$('#admPw');i.classList.remove('shake');void i.offsetWidth;i.classList.add('shake');i.select();toast('Contraseña incorrecta')}}
+$('#admOk').onclick=admLogin;$('#admPw').onkeydown=e=>{if(e.key==='Enter')admLogin()};$('#admNo').onclick=()=>$('#admDlg').close();
+const rk=()=>Math.random().toString(36).slice(2,10);
+$('#grid').addEventListener('change',e=>{const a=e.target.closest('[data-adm=vis]');if(!a)return;const id=a.closest('.actl').dataset.id,d=allRaw().find(x=>x.id===id);
+  adm.vis[id]=a.value;if(a.value==='link'&&!d.key)adm.keys[id]=rk();saveAdm();renderDocs();renderHome();toast(a.value==='public'?'Documento público':a.value==='link'?'Solo visible con su enlace':'Documento oculto')});
+$('#grid').addEventListener('click',e=>{const b=e.target.closest('button[data-adm]');if(!b)return;const id=b.closest('.actl').dataset.id,d=allRaw().find(x=>x.id===id);
+  if(b.dataset.adm==='copy'){const u=`${location.origin}${location.pathname}?doc=${encodeURIComponent(id)}&k=${d.key}`;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>toast('Enlace privado copiado'),()=>prompt('Copia el enlace:',u))}
+  if(b.dataset.adm==='del'&&confirm('¿Eliminar «'+d.title+'»? Sus comentarios se conservan.')){if(extra.some(x=>x.id===id))extra=extra.filter(x=>x.id!==id);else adm.removed.push(id);saveAdm();save();if(cur===id)goHome();renderDocs();renderHome()}});
+$('#admExp').onclick=()=>{const txt=JSON.stringify(allRaw().map(({id,title,url,vis,key})=>({id,title,url,vis,...(key?{key}:{})})),null,2);
+  (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast('Configuración copiada. Pásamela en el chat y la publico para todos'),()=>prompt('Copia esta configuración:',txt))};
 /* Brillo especular que sigue al puntero (como el cristal líquido de Apple) */
 document.addEventListener('pointermove',e=>{const g=e.target.closest&&e.target.closest('#side,#panel,.bar,.dock,.card-d');if(!g)return;const r=g.getBoundingClientRect();g.style.setProperty('--mx',(e.clientX-r.left)+'px');g.style.setProperty('--my',(e.clientY-r.top)+'px')},{passive:true});
 /* ---------- Inicio ---------- */
 ['#oSide','#oSide1'].forEach(s=>$(s).onclick=()=>document.body.classList.toggle('o-side'));
 $('#oPanel').onclick=()=>document.body.classList.toggle('o-panel');
-applyZoom();showUser();setDesigner(designer);renderDocs();renderHome();
+applyZoom();showUser();setAdmin(admin);
 const q=new URLSearchParams(location.search).get('doc');
 if(all().some(d=>d.id===q))openDoc(q);
 if(!user)askName();
