@@ -221,6 +221,7 @@ dialog{border-radius:32px;padding:28px}dialog h2{font-size:24px;letter-spacing:-
 dialog input[type=file]{border-style:dashed;padding:16px 12px;cursor:pointer}
 body:not(.admin) #shareBtn{display:none}
 #shUrl{font-size:13px}
+dialog{margin:auto}
 </style>
 </head>
 <body class="home">
@@ -589,7 +590,6 @@ $('#oPanel').onclick=()=>document.body.classList.toggle('o-panel');
 applyZoom();showUser();setAdmin(admin);
 const q=new URLSearchParams(location.search).get('doc');
 loadRemote().then(()=>{renderDocs();renderHome();if(all().some(d=>d.id===q))openDoc(q)});
-if(!user)askName();
 </script>
 </body>
 </html>
