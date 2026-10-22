@@ -215,6 +215,12 @@ dialog{border-radius:32px;padding:28px}dialog h2{font-size:24px;letter-spacing:-
 .nav .vs{margin-left:auto}.nav .vs+.dot{margin-left:6px}
 @media (prefers-color-scheme:dark){.vs{color:var(--amber)}}
 .shake{animation:shake .3s}@keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+
+.steps{padding-left:18px;margin:0 0 12px;color:var(--muted);font-size:13.5px}.steps li{margin:5px 0}.steps a{color:var(--accent)}
+#upVis{width:100%;padding:10px 14px;margin-bottom:8px;border-radius:16px}
+dialog input[type=file]{border-style:dashed;padding:16px 12px;cursor:pointer}
+body:not(.admin) #shareBtn{display:none}
+#shUrl{font-size:13px}
 </style>
 </head>
 <body class="home">
@@ -231,7 +237,7 @@ dialog{border-radius:32px;padding:28px}dialog h2{font-size:24px;letter-spacing:-
  <button class="btn mob" id="oSide1" style="margin-bottom:16px">Menú</button>
  <h1>Documentos para revisar</h1>
  <p class="s">Abre un documento y deja tus comentarios exactamente donde importan.</p>
- <div class="admbar" id="admBar" hidden><b>Modo administrador</b><span>Los cambios se ven en este navegador. Para publicarlos para todos, exporta la configuración.</span><button class="btn sm" id="admExp">Exportar configuración</button></div>
+ <div class="admbar" id="admBar" hidden><b>Modo administrador</b><span id="admMsg"></span><button class="btn sm primary" id="admUp">Subir PDF</button><button class="btn sm" id="admPub">Publicar cambios</button><button class="btn sm" id="admGh">GitHub</button></div>
  <div class="grid" id="grid"></div>
 </section>
 
@@ -239,6 +245,7 @@ dialog{border-radius:32px;padding:28px}dialog h2{font-size:24px;letter-spacing:-
  <div class="bar">
   <button class="btn mob" id="oSide">Menú</button>
   <h2 id="docTitle"></h2>
+  <button class="btn sm primary" id="shareBtn">Compartir</button>
   <a class="btn sm" id="openNew" target="_blank" rel="noopener">Abrir original</a>
   <button class="btn sm mob" id="oPanel">Comentarios</button>
  </div>
@@ -262,6 +269,9 @@ dialog{border-radius:32px;padding:28px}dialog h2{font-size:24px;letter-spacing:-
 <button id="selBtn" hidden>Comentar selección</button>
 <dialog id="nameDlg"><h2>¿Cómo te llamas?</h2><p>Tu nombre aparecerá junto a cada comentario.</p><input id="nameIn" maxlength="40" placeholder="Nombre y apellido" autocomplete="name"><div class="row"><button class="btn primary" id="nameOk">Empezar a revisar</button></div></dialog>
 <dialog id="addDlg"><h2>Añadir documento</h2><p>Pega un enlace a un PDF, imagen, Google Docs / Slides / Drive u otra web.</p><input id="addT" placeholder="Título del documento"><input id="addU" placeholder="https://…" inputmode="url"><div class="row"><button class="btn" id="addNo">Cancelar</button><button class="btn primary" id="addOk">Añadir</button></div></dialog>
+<dialog id="shDlg"><h2>Enlace para revisar</h2><p id="shNote"></p><input id="shUrl" readonly><div class="row" style="justify-content:flex-start;flex-wrap:wrap"><button class="btn primary" id="shCopy">Copiar enlace</button><a class="btn" id="shWa" target="_blank" rel="noopener">WhatsApp</a><a class="btn" id="shMail">Correo</a><button class="btn" id="shClose" style="margin-left:auto">Cerrar</button></div></dialog>
+<dialog id="upDlg"><h2>Subir documento</h2><p>Se guarda en tu repositorio de GitHub y queda publicado en la web.</p><input type="file" id="upFile" accept="application/pdf,.pdf,image/*"><input id="upTitle" placeholder="Título del documento"><select id="upVis"><option value="public">Público</option><option value="link">Solo con enlace</option><option value="hidden">Oculto</option></select><div class="row"><button class="btn" id="upNo">Cancelar</button><button class="btn primary" id="upOk">Subir y publicar</button></div></dialog>
+<dialog id="ghDlg"><h2>Conectar con GitHub</h2><p>Para subir archivos desde la web hace falta un token. Se guarda solo en este navegador.</p><ol class="steps"><li>Abre <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a></li><li>En <b>Repository access</b> elige <i>Only select repositories</i> y marca <b>revision-documentos</b></li><li>En <b>Permissions → Contents</b> elige <i>Read and write</i></li><li>Pulsa <b>Generate token</b> y pégalo aquí</li></ol><input id="ghTok" type="password" placeholder="github_pat_…" autocomplete="off"><div class="row"><button class="btn" id="ghOff">Desconectar</button><button class="btn" id="ghNo">Cancelar</button><button class="btn primary" id="ghOk">Guardar</button></div></dialog>
 <dialog id="admDlg"><h2>Acceso de administrador</h2><p>Introduce la contraseña para gestionar los documentos.</p><input id="admPw" type="password" inputmode="numeric" autocomplete="current-password" placeholder="Contraseña"><div class="row"><button class="btn" id="admNo">Cancelar</button><button class="btn primary" id="admOk">Entrar</button></div></dialog>
 <div class="toast" id="toast" role="status"></div>
 
@@ -285,8 +295,9 @@ let extra=store.get('extra',[]),comments=store.get('comments',[]).map(norm),appr
 const adm=store.get('adm',{vis:{},removed:[],keys:{}});let admin=false;try{admin=sessionStorage.getItem('rv.admin')==='1'}catch{}
 const myKeys=store.get('keys',[]);
 (()=>{const k=new URLSearchParams(location.search).get('k');if(k&&!myKeys.includes(k)){myKeys.push(k);store.set('keys',myKeys)}})();
-const eff=d=>({...d,vis:adm.vis[d.id]||d.vis||'public',key:adm.keys[d.id]||d.key||''});
-const allRaw=()=>[...DOCS.filter(d=>!adm.removed.includes(d.id)),...extra].map(eff);
+let remote={docs:[],removed:[]};const tmp={};
+const eff=d=>({...d,raw:d.url,type:typeOf(d.url),url:tmp[d.id]||d.url,vis:adm.vis[d.id]||d.vis||'public',key:adm.keys[d.id]||d.key||''});
+const allRaw=()=>{const m=new Map(DOCS.filter(d=>!remote.removed.includes(d.id)).map(d=>[d.id,d]));remote.docs.forEach(d=>m.set(d.id,d));return [...m.values()].filter(d=>!adm.removed.includes(d.id)).concat(extra).map(eff)};
 const visible=d=>admin||d.vis==='public'||(d.vis==='link'&&d.key&&myKeys.includes(d.key));
 const all=()=>allRaw().filter(visible);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -305,15 +316,16 @@ const statTag=id=>approved[id]?'<span class="tag appr">Aprobado</span>':nOpen(id
 
 /* ---------- Inicio y lista ---------- */
 const vsTag=d=>admin&&d.vis!=='public'?`<small class="vs">${d.vis==='hidden'?'Oculto':'Enlace'}</small>`:'';
-const adminCtl=d=>`<div class="actl" data-id="${esc(d.id)}"><select data-adm="vis" aria-label="Visibilidad"><option value="public" ${d.vis==='public'?'selected':''}>Público</option><option value="link" ${d.vis==='link'?'selected':''}>Solo con enlace</option><option value="hidden" ${d.vis==='hidden'?'selected':''}>Oculto</option></select>${d.vis==='link'?'<button class="btn sm" data-adm="copy">Copiar enlace</button>':''}<button class="btn sm" data-adm="del">Eliminar</button></div>`;
+const adminCtl=d=>`<div class="actl" data-id="${esc(d.id)}"><select data-adm="vis" aria-label="Visibilidad"><option value="public" ${d.vis==='public'?'selected':''}>Público</option><option value="link" ${d.vis==='link'?'selected':''}>Solo con enlace</option><option value="hidden" ${d.vis==='hidden'?'selected':''}>Oculto</option></select>${d.vis!=='hidden'?'<button class="btn sm" data-adm="copy">Compartir enlace</button>':''}<button class="btn sm" data-adm="del">Eliminar</button></div>`;
 function renderDocs(){
   $('#goHome').classList.toggle('sel',!cur);
   $('#docList').innerHTML=all().map(d=>`<button class="nav ${d.id===cur?'sel':''}" data-id="${esc(d.id)}"><span class="t">${esc(d.title)}</span>${vsTag(d)}<span class="dot ${approved[d.id]?'ok':nOpen(d.id)?'open':''}"></span></button>`).join('');
 }
 function renderHome(){
-  $('#grid').innerHTML=all().map(d=>{const t=typeOf(d.url),n=comments.filter(c=>c.doc===d.id).length;
+  $('#grid').innerHTML=all().map(d=>{const t=d.type,n=comments.filter(c=>c.doc===d.id).length;
     return `<div class="cw"><button class="card-d" data-id="${esc(d.id)}"><div class="th">${t==='img'?`<img src="${esc(d.url)}" alt="">`:'<div class="sheet"><i></i><i></i><i></i><i style="width:60%"></i></div>'}<span class="tag tg">${t==='embed'?'Web':t.toUpperCase()}</span></div><div class="cm"><b>${esc(d.title)}</b><small>${n} comentario${n===1?'':'s'}</small> ${statTag(d.id)}${vsTag(d)}</div></button>${admin?adminCtl(d):''}</div>`}).join('')
    +'<button class="card-d new" id="newCard">+ Añadir documento</button>';
+  updAdm();
 }
 $('#grid').addEventListener('click',e=>{if(e.target.closest('#newCard'))return $('#addDlg').showModal();const b=e.target.closest('.card-d');if(b)openDoc(b.dataset.id)});
 $('#docList').addEventListener('click',e=>{const b=e.target.closest('.nav');if(b){openDoc(b.dataset.id);document.body.classList.remove('o-side')}});
@@ -338,7 +350,7 @@ async function openDoc(id){
   document.body.classList.remove('home');renderDocs();renderPanel();setCommenting(false);
   $('#docTitle').textContent=d.title;$('#openNew').href=d.url;updApprove();
   const pages=$('#pages');pages.innerHTML='<div class="empty"><b>Cargando…</b>Preparando el documento.</div>';
-  const t=typeOf(d.url);
+  const t=d.type;
   const embed=()=>{pages.innerHTML='';const f=document.createElement('iframe');f.src=embedUrl(d.url);f.title=d.title;f.loading='lazy';mkPage(pages,0,'0.72',[f]);drawPins()};
   if(t==='img'){pages.innerHTML='';const im=new Image();im.src=d.url;im.alt=d.title;im.onload=drawPins;mkPage(pages,0,null,[im])}
   else if(t==='pdf'){
@@ -509,10 +521,66 @@ const rk=()=>Math.random().toString(36).slice(2,10);
 $('#grid').addEventListener('change',e=>{const a=e.target.closest('[data-adm=vis]');if(!a)return;const id=a.closest('.actl').dataset.id,d=allRaw().find(x=>x.id===id);
   adm.vis[id]=a.value;if(a.value==='link'&&!d.key)adm.keys[id]=rk();saveAdm();renderDocs();renderHome();toast(a.value==='public'?'Documento público':a.value==='link'?'Solo visible con su enlace':'Documento oculto')});
 $('#grid').addEventListener('click',e=>{const b=e.target.closest('button[data-adm]');if(!b)return;const id=b.closest('.actl').dataset.id,d=allRaw().find(x=>x.id===id);
-  if(b.dataset.adm==='copy'){const u=`${location.origin}${location.pathname}?doc=${encodeURIComponent(id)}&k=${d.key}`;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>toast('Enlace privado copiado'),()=>prompt('Copia el enlace:',u))}
+  if(b.dataset.adm==='copy')share(id);
   if(b.dataset.adm==='del'&&confirm('¿Eliminar «'+d.title+'»? Sus comentarios se conservan.')){if(extra.some(x=>x.id===id))extra=extra.filter(x=>x.id!==id);else adm.removed.push(id);saveAdm();save();if(cur===id)goHome();renderDocs();renderHome()}});
-$('#admExp').onclick=()=>{const txt=JSON.stringify(allRaw().map(({id,title,url,vis,key})=>({id,title,url,vis,...(key?{key}:{})})),null,2);
-  (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>toast('Configuración copiada. Pásamela en el chat y la publico para todos'),()=>prompt('Copia esta configuración:',txt))};
+/* ---------- Subida directa y publicación en GitHub ---------- */
+const REPO={o:'robeespinosa',r:'revision-documentos',b:'main'};
+const API=`https://api.github.com/repos/${REPO.o}/${REPO.r}/contents/`;
+const tokGet=()=>store.get('gh','');
+const b64=t=>btoa(unescape(encodeURIComponent(t)));
+const fileB64=f=>new Promise((ok,ko)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(',')[1]);r.onerror=ko;r.readAsDataURL(f)});
+const slug=t=>t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'doc';
+async function gh(path,method='GET',body){
+  const r=await fetch(API+path.split('/').map(encodeURIComponent).join('/')+(method==='GET'?'?ref='+REPO.b+'&t='+Date.now():''),{method,headers:{Authorization:'Bearer '+tokGet(),Accept:'application/vnd.github+json',...(body?{'Content-Type':'application/json'}:{})},body:body&&JSON.stringify(body)});
+  if(r.status===404&&method==='GET')return null;
+  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.message||('Error '+r.status));return j;
+}
+const ghPut=async(path,content,msg)=>{const c=await gh(path);return gh(path,'PUT',{message:msg,content,branch:REPO.b,...(c?{sha:c.sha}:{})})};
+const ghDel=async path=>{const c=await gh(path);if(c)await gh(path,'DELETE',{message:'Eliminar '+path,sha:c.sha,branch:REPO.b})};
+async function loadRemote(){try{const r=await fetch('docs.json?t='+Date.now(),{cache:'no-store'});if(r.ok){const j=await r.json();remote={docs:j.docs||[],removed:j.removed||[]}}}catch{}}
+async function publishConfig(){
+  const removed=[...new Set([...remote.removed,...adm.removed])];
+  const gone=[...DOCS,...remote.docs].filter(d=>adm.removed.includes(d.id)&&String(d.url).startsWith('docs/'));
+  const docs=allRaw().map(({id,title,raw,vis,key})=>({id,title,url:raw,vis,...(key?{key}:{})}));
+  await ghPut('docs.json',b64(JSON.stringify({docs,removed},null,2)),'Actualizar documentos');
+  for(const d of gone)await ghDel(d.url).catch(()=>{});
+  remote={docs,removed};adm.vis={};adm.keys={};adm.removed=[];extra=[];saveAdm();save();renderDocs();renderHome();
+}
+function updAdm(){const dirty=!!(adm.removed.length||Object.keys(adm.vis).length||extra.length),m=$('#admMsg');
+  if(m)m.textContent=dirty?'Tienes cambios sin publicar.':'Arrastra un PDF aquí o pulsa “Subir PDF”.';$('#admPub').disabled=!dirty}
+async function doUpload(){
+  const f=$('#upFile').files[0];if(!f)return toast('Elige un archivo');if(f.size>40e6)return toast('El archivo supera los 40 MB');
+  const title=$('#upTitle').value.trim()||f.name.replace(/\.[^.]+$/,''),vis=$('#upVis').value,ext=(f.name.split('.').pop()||'pdf').toLowerCase().replace(/[^a-z0-9]/g,''),id=slug(title)+'-'+rk().slice(0,4),path=`docs/${id}.${ext}`;
+  const ok=$('#upOk');ok.disabled=true;ok.textContent='Subiendo…';
+  try{
+    await ghPut(path,await fileB64(f),'Subir '+title);
+    tmp[id]=URL.createObjectURL(f);remote.docs.push({id,title,url:path,vis,...(vis==='link'?{key:rk()}:{})});
+    await publishConfig();$('#upDlg').close();share(id,true);
+  }catch(e){toast('No se pudo subir: '+e.message)}
+  ok.disabled=false;ok.textContent='Subir y publicar';
+}
+const openUp=()=>tokGet()?$('#upDlg').showModal():$('#ghDlg').showModal();
+$('#admUp').onclick=()=>{$('#upFile').value='';$('#upTitle').value='';openUp()};
+$('#admGh').onclick=()=>{$('#ghTok').value=tokGet();$('#ghDlg').showModal()};
+$('#upFile').onchange=e=>{const f=e.target.files[0];if(f&&!$('#upTitle').value)$('#upTitle').value=f.name.replace(/\.[^.]+$/,'')};
+$('#upNo').onclick=()=>$('#upDlg').close();$('#upOk').onclick=doUpload;
+$('#admPub').onclick=async()=>{if(!tokGet())return $('#ghDlg').showModal();$('#admPub').disabled=true;$('#admPub').textContent='Publicando…';
+  try{await publishConfig();toast('Cambios publicados para todos')}catch(e){toast('No se pudo publicar: '+e.message)}$('#admPub').textContent='Publicar cambios';updAdm()};
+$('#ghNo').onclick=()=>$('#ghDlg').close();
+$('#ghOff').onclick=()=>{store.set('gh','');$('#ghTok').value='';$('#ghDlg').close();toast('GitHub desconectado')};
+$('#ghOk').onclick=async()=>{const t=$('#ghTok').value.trim();if(!t)return;store.set('gh',t);
+  try{const r=await fetch(`https://api.github.com/repos/${REPO.o}/${REPO.r}`,{headers:{Authorization:'Bearer '+t}});if(!r.ok)throw 0;const j=await r.json();if(j.permissions&&!j.permissions.push)throw 0;$('#ghDlg').close();toast('Conectado con GitHub ✓')}
+  catch{store.set('gh','');toast('Token no válido o sin permiso de escritura en el repositorio')}};
+['dragover','drop'].forEach(ev=>$('#home').addEventListener(ev,e=>{if(!admin)return;e.preventDefault();const f=ev==='drop'&&e.dataTransfer.files[0];
+  if(f){$('#upFile').files=e.dataTransfer.files;$('#upTitle').value=f.name.replace(/\.[^.]+$/,'');openUp()}}));
+function share(id,fresh){const d=allRaw().find(x=>x.id===id);if(!d)return;
+  const u=`${location.origin}${location.pathname}?doc=${encodeURIComponent(id)}${d.vis==='link'&&d.key?'&k='+d.key:''}`,msg=`Revisa «${d.title}» y deja tus comentarios: ${u}`;
+  $('#shUrl').value=u;$('#shWa').href='https://wa.me/?text='+encodeURIComponent(msg);$('#shMail').href='mailto:?subject='+encodeURIComponent('Revisión: '+d.title)+'&body='+encodeURIComponent(msg);
+  const dirty=!!(adm.removed.length||Object.keys(adm.vis).length||extra.length);
+  $('#shNote').textContent=d.vis==='hidden'?'Este documento está oculto: el enlace no funcionará hasta que lo pases a Público o Solo con enlace y publiques.':'Quien entre con este enlace abre el documento directamente y puede comentar.'+(fresh?' Puede tardar cerca de 1 minuto en estar disponible para todos.':'')+(dirty?' Pulsa «Publicar cambios» para que funcione.':'');
+  $('#shDlg').showModal()}
+$('#shCopy').onclick=()=>navigator.clipboard?navigator.clipboard.writeText($('#shUrl').value).then(()=>toast('Enlace copiado'),()=>$('#shUrl').select()):$('#shUrl').select();
+$('#shClose').onclick=()=>$('#shDlg').close();$('#shareBtn').onclick=()=>cur&&share(cur);
 /* Brillo especular que sigue al puntero (como el cristal líquido de Apple) */
 document.addEventListener('pointermove',e=>{const g=e.target.closest&&e.target.closest('#side,#panel,.bar,.dock,.card-d');if(!g)return;const r=g.getBoundingClientRect();g.style.setProperty('--mx',(e.clientX-r.left)+'px');g.style.setProperty('--my',(e.clientY-r.top)+'px')},{passive:true});
 /* ---------- Inicio ---------- */
@@ -520,7 +588,7 @@ document.addEventListener('pointermove',e=>{const g=e.target.closest&&e.target.c
 $('#oPanel').onclick=()=>document.body.classList.toggle('o-panel');
 applyZoom();showUser();setAdmin(admin);
 const q=new URLSearchParams(location.search).get('doc');
-if(all().some(d=>d.id===q))openDoc(q);
+loadRemote().then(()=>{renderDocs();renderHome();if(all().some(d=>d.id===q))openDoc(q)});
 if(!user)askName();
 </script>
 </body>
