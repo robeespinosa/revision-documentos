@@ -222,13 +222,14 @@ dialog input[type=file]{border-style:dashed;padding:16px 12px;cursor:pointer}
 body:not(.admin) #shareBtn{display:none}
 #shUrl{font-size:13px}
 dialog{margin:auto}
+.hh{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
 </style>
 </head>
 <body class="home">
 <aside id="side">
  <div class="brand"><i></i>Revisión</div>
  <button class="nav sel" id="goHome">Inicio</button>
- <div class="lbl">Documentos <button class="btn sm" id="add">+ Enlace</button></div>
+ <div class="lbl">Documentos <button class="btn sm" id="add">+ Añadir</button></div>
  <div id="docList"></div>
  <button class="me" id="who"></button>
  <button class="adm-btn" id="admBtn"></button>
@@ -236,8 +237,8 @@ dialog{margin:auto}
 
 <section id="home">
  <button class="btn mob" id="oSide1" style="margin-bottom:16px">Menú</button>
- <h1>Documentos para revisar</h1>
- <p class="s">Abre un documento y deja tus comentarios exactamente donde importan.</p>
+ <div class="hh"><div><h1>Documentos para revisar</h1>
+ <p class="s">Abre un documento y deja tus comentarios exactamente donde importan.</p></div><button class="btn primary" id="homeUp" style="align-self:center">Subir PDF</button></div>
  <div class="admbar" id="admBar" hidden><b>Modo administrador</b><span id="admMsg"></span><button class="btn sm primary" id="admUp">Subir PDF</button><button class="btn sm" id="admPub">Publicar cambios</button><button class="btn sm" id="admGh">GitHub</button></div>
  <div class="grid" id="grid"></div>
 </section>
@@ -269,7 +270,7 @@ dialog{margin:auto}
 <div class="ctx" id="ctx" hidden></div>
 <button id="selBtn" hidden>Comentar selección</button>
 <dialog id="nameDlg"><h2>¿Cómo te llamas?</h2><p>Tu nombre aparecerá junto a cada comentario.</p><input id="nameIn" maxlength="40" placeholder="Nombre y apellido" autocomplete="name"><div class="row"><button class="btn primary" id="nameOk">Empezar a revisar</button></div></dialog>
-<dialog id="addDlg"><h2>Añadir documento</h2><p>Pega un enlace a un PDF, imagen, Google Docs / Slides / Drive u otra web.</p><input id="addT" placeholder="Título del documento"><input id="addU" placeholder="https://…" inputmode="url"><div class="row"><button class="btn" id="addNo">Cancelar</button><button class="btn primary" id="addOk">Añadir</button></div></dialog>
+<dialog id="addDlg"><h2>Añadir documento</h2><p>Sube un PDF desde tu equipo o pega un enlace.</p><button class="btn primary" id="addUp" style="width:100%;justify-content:center;margin-bottom:10px">Subir un PDF desde mi equipo</button><p style="text-align:center;margin:0 0 10px">o pega un enlace (imagen, Google Docs, Slides, Drive…)</p><input id="addT" placeholder="Título del documento"><input id="addU" placeholder="https://…" inputmode="url"><div class="row"><button class="btn" id="addNo">Cancelar</button><button class="btn primary" id="addOk">Añadir</button></div></dialog>
 <dialog id="shDlg"><h2>Enlace para revisar</h2><p id="shNote"></p><input id="shUrl" readonly><div class="row" style="justify-content:flex-start;flex-wrap:wrap"><button class="btn primary" id="shCopy">Copiar enlace</button><a class="btn" id="shWa" target="_blank" rel="noopener">WhatsApp</a><a class="btn" id="shMail">Correo</a><button class="btn" id="shClose" style="margin-left:auto">Cerrar</button></div></dialog>
 <dialog id="upDlg"><h2>Subir documento</h2><p>Se guarda en tu repositorio de GitHub y queda publicado en la web.</p><input type="file" id="upFile" accept="application/pdf,.pdf,image/*"><input id="upTitle" placeholder="Título del documento"><select id="upVis"><option value="public">Público</option><option value="link">Solo con enlace</option><option value="hidden">Oculto</option></select><div class="row"><button class="btn" id="upNo">Cancelar</button><button class="btn primary" id="upOk">Subir y publicar</button></div></dialog>
 <dialog id="ghDlg"><h2>Conectar con GitHub</h2><p>Para subir archivos desde la web hace falta un token. Se guarda solo en este navegador.</p><ol class="steps"><li>Abre <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a></li><li>En <b>Repository access</b> elige <i>Only select repositories</i> y marca <b>revision-documentos</b></li><li>En <b>Permissions → Contents</b> elige <i>Read and write</i></li><li>Pulsa <b>Generate token</b> y pégalo aquí</li></ol><input id="ghTok" type="password" placeholder="github_pat_…" autocomplete="off"><div class="row"><button class="btn" id="ghOff">Desconectar</button><button class="btn" id="ghNo">Cancelar</button><button class="btn primary" id="ghOk">Guardar</button></div></dialog>
@@ -515,9 +516,9 @@ function setAdmin(v){admin=v;try{sessionStorage.setItem('rv.admin',v?'1':'0')}ca
   setDesigner(v);if(cur&&!all().some(d=>d.id===cur))goHome();else{renderDocs();renderHome()}}
 $('#admBtn').onclick=()=>admin?(setAdmin(false),toast('Sesión de administrador cerrada')):($('#admPw').value='',$('#admDlg').showModal(),$('#admPw').focus());
 async function admLogin(){let ok=false;try{ok=(await sha($('#admPw').value.trim()))===HASH}catch{toast('Abre la web por https para iniciar sesión');return}
-  if(ok){$('#admDlg').close();setAdmin(true);toast('Modo administrador activado')}
+  if(ok){$('#admDlg').close();setAdmin(true);toast('Modo administrador activado');if(afterLogin){const f=afterLogin;afterLogin=null;f()}}
   else{const i=$('#admPw');i.classList.remove('shake');void i.offsetWidth;i.classList.add('shake');i.select();toast('Contraseña incorrecta')}}
-$('#admOk').onclick=admLogin;$('#admPw').onkeydown=e=>{if(e.key==='Enter')admLogin()};$('#admNo').onclick=()=>$('#admDlg').close();
+$('#admOk').onclick=admLogin;$('#admPw').onkeydown=e=>{if(e.key==='Enter')admLogin()};$('#admNo').onclick=()=>{afterLogin=null;$('#admDlg').close()};
 const rk=()=>Math.random().toString(36).slice(2,10);
 $('#grid').addEventListener('change',e=>{const a=e.target.closest('[data-adm=vis]');if(!a)return;const id=a.closest('.actl').dataset.id,d=allRaw().find(x=>x.id===id);
   adm.vis[id]=a.value;if(a.value==='link'&&!d.key)adm.keys[id]=rk();saveAdm();renderDocs();renderHome();toast(a.value==='public'?'Documento público':a.value==='link'?'Solo visible con su enlace':'Documento oculto')});
@@ -557,21 +558,29 @@ async function doUpload(){
     await ghPut(path,await fileB64(f),'Subir '+title);
     tmp[id]=URL.createObjectURL(f);remote.docs.push({id,title,url:path,vis,...(vis==='link'?{key:rk()}:{})});
     await publishConfig();$('#upDlg').close();share(id,true);
-  }catch(e){toast('No se pudo subir: '+e.message)}
+  }catch(e){toast('No se pudo subir: '+ghErr(e))}
   ok.disabled=false;ok.textContent='Subir y publicar';
 }
-const openUp=()=>tokGet()?$('#upDlg').showModal():$('#ghDlg').showModal();
+let afterLogin=null,wantUp=false;
+const openUp=()=>{if(tokGet())$('#upDlg').showModal();else{wantUp=true;$('#ghDlg').showModal()}};
+function needAdmin(){if(admin)return openUp();afterLogin=openUp;$('#admPw').value='';$('#admDlg').showModal();$('#admPw').focus()}
+$('#homeUp').onclick=needAdmin;$('#addUp').onclick=()=>{$('#addDlg').close();needAdmin()};
 $('#admUp').onclick=()=>{$('#upFile').value='';$('#upTitle').value='';openUp()};
 $('#admGh').onclick=()=>{$('#ghTok').value=tokGet();$('#ghDlg').showModal()};
 $('#upFile').onchange=e=>{const f=e.target.files[0];if(f&&!$('#upTitle').value)$('#upTitle').value=f.name.replace(/\.[^.]+$/,'')};
 $('#upNo').onclick=()=>$('#upDlg').close();$('#upOk').onclick=doUpload;
 $('#admPub').onclick=async()=>{if(!tokGet())return $('#ghDlg').showModal();$('#admPub').disabled=true;$('#admPub').textContent='Publicando…';
-  try{await publishConfig();toast('Cambios publicados para todos')}catch(e){toast('No se pudo publicar: '+e.message)}$('#admPub').textContent='Publicar cambios';updAdm()};
-$('#ghNo').onclick=()=>$('#ghDlg').close();
+  try{await publishConfig();toast('Cambios publicados para todos')}catch(e){toast('No se pudo publicar: '+ghErr(e))}$('#admPub').textContent='Publicar cambios';updAdm()};
+$('#ghNo').onclick=()=>{wantUp=false;$('#ghDlg').close()};
 $('#ghOff').onclick=()=>{store.set('gh','');$('#ghTok').value='';$('#ghDlg').close();toast('GitHub desconectado')};
-$('#ghOk').onclick=async()=>{const t=$('#ghTok').value.trim();if(!t)return;store.set('gh',t);
-  try{const r=await fetch(`https://api.github.com/repos/${REPO.o}/${REPO.r}`,{headers:{Authorization:'Bearer '+t}});if(!r.ok)throw 0;const j=await r.json();if(j.permissions&&!j.permissions.push)throw 0;$('#ghDlg').close();toast('Conectado con GitHub ✓')}
-  catch{store.set('gh','');toast('Token no válido o sin permiso de escritura en el repositorio')}};
+$('#ghOk').onclick=async()=>{const t=$('#ghTok').value.replace(/\s/g,'');if(!t)return;
+  try{const r=await fetch(`https://api.github.com/repos/${REPO.o}/${REPO.r}`,{headers:{Authorization:'Bearer '+t}});
+    if(r.status===401)return toast('GitHub no reconoce ese token: cópialo completo (empieza por github_pat_)');
+    if(r.status===404)return toast('El token no tiene acceso al repositorio revision-documentos: créalo marcando ese repositorio');
+    if(!r.ok)return toast('GitHub respondió con error '+r.status);
+    store.set('gh',t);$('#ghDlg').close();toast('Conectado con GitHub ✓')}
+  catch{toast('No se pudo contactar con GitHub. Revisa tu conexión')}};
+const ghErr=e=>/not accessible|forbidden/i.test(e.message)?'El token no tiene permiso de escritura: créalo de nuevo con Contents → Read and write':/bad credentials/i.test(e.message)?'Token inválido o caducado: vuelve a conectarlo con el botón GitHub':e.message;
 ['dragover','drop'].forEach(ev=>$('#home').addEventListener(ev,e=>{if(!admin)return;e.preventDefault();const f=ev==='drop'&&e.dataTransfer.files[0];
   if(f){$('#upFile').files=e.dataTransfer.files;$('#upTitle').value=f.name.replace(/\.[^.]+$/,'');openUp()}}));
 function share(id,fresh){const d=allRaw().find(x=>x.id===id);if(!d)return;
