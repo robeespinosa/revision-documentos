@@ -355,6 +355,7 @@ body.admin #homeUp{display:none}
 body.admin #sendTop,body.admin #sendBtn{display:none}
 body:not(.admin) #imp,body:not(.admin) #pasteCode{display:none}
 #pcTxt{min-height:140px;font-size:12.5px}#inMail{margin-bottom:10px}
+.hint{display:block;color:var(--muted);font-size:12px;margin-top:-4px}
 </style>
 </head>
 <body class="home">
@@ -558,7 +559,7 @@ function compose(page,p,x,y,sel){
   const lab=sel?.area?'Comentario de área':sel?.quote?'Texto seleccionado':'Comentario';
   c.innerHTML=`<div class="ch">${av(user)}${esc(user)}<small>${lab}</small></div>${sel?.quote?`<div class="quote">“${esc(sel.quote)}”</div>`:''}
   <div class="kinds">${Object.entries(KINDS).map(([k,v],i)=>`<label class="${v[1]}"><input type="radio" name="k" value="${k}" ${i?'':'checked'}>${v[0]}</label>`).join('')}</div>
-  <textarea placeholder="Cuéntame qué cambiarías aquí…" aria-label="Comentario"></textarea>
+  <textarea placeholder="Cuéntame qué cambiarías aquí…" aria-label="Comentario"></textarea>${!admin&&inboxMail()?'<small class="hint">Al guardar, se envía automáticamente al diseñador.</small>':''}
   <div class="row"><button class="btn sm" data-a="x">Cancelar</button><button class="btn sm primary" data-a="s">Guardar</button></div>`;
   page.append(c);const ta=c.querySelector('textarea');ta.focus();
   c.addEventListener('pointerdown',e=>e.stopPropagation());
@@ -566,7 +567,7 @@ function compose(page,p,x,y,sel){
     if(a==='s'){const text=ta.value.trim();if(!text)return ta.focus();
       const o={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),doc:cur,p,x,y,text,kind:c.querySelector('input:checked').value,author:user,at:Date.now(),status:'open',replies:[]};
       if(sel?.quote){o.quote=sel.quote;o.rects=sel.rects}if(sel?.area)o.area=sel.area;
-      comments.push(o);c.remove();setCommenting(false);activeId=o.id;tab='fb';refresh();toast('Comentario guardado')}};
+      comments.push(o);c.remove();setCommenting(false);activeId=o.id;tab='fb';refresh();scheduleAuto();toast(!admin&&inboxMail()?'Comentario guardado · se envía solo al diseñador':'Comentario guardado')}};
   c.onkeydown=e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey))c.querySelector('[data-a=s]').click()};
 }
 function selInfo(){
@@ -643,7 +644,7 @@ $('#list').addEventListener('click',e=>{
 });
 $('#list').addEventListener('keydown',e=>{
   if(e.key!=='Enter'||!e.target.classList.contains('rin'))return;const t=e.target.value.trim();if(!t)return;if(!user)return askName();
-  comments.find(x=>x.id===activeId).replies.push({author:user,text:t,at:Date.now(),role:designer?'diseñador':''});save();renderPanel();
+  comments.find(x=>x.id===activeId).replies.push({author:user,text:t,at:Date.now(),role:designer?'diseñador':''});save();renderPanel();updSend();scheduleAuto();
 });
 
 /* ---------- Aprobación, zoom, atajos ---------- */
@@ -839,7 +840,7 @@ function openSend(){
   $('#sdInfo').textContent=`${list.length} comentario${list.length===1?'':'s'} en ${nd} documento${nd===1?'':'s'} listos para enviar.`;
   $('#sdNote').textContent=inboxMail()?'Se enviarán al diseñador al pulsar el botón.':'El diseñador aún no activó el envío automático: copia el código o descarga el archivo y mándaselo.';
   $('#sdGo').hidden=!inboxMail();$('#sdOut').textContent='';$('#sendDlg').showModal()}
-const formPost=(mail,body)=>fetch('https://formsubmit.co/ajax/'+encodeURIComponent(mail),{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({_captcha:'false',_template:'box',...body})}).then(async r=>{const j=await r.json().catch(()=>({}));if(/activation/i.test(j.message||''))return {activation:true};if(!r.ok||j.success==='false'||j.success===false)throw new Error(j.message||'Error '+r.status);return j});
+const formPost=(mail,body)=>fetch('https://formsubmit.co/ajax/'+encodeURIComponent(mail),{method:'POST',keepalive:true,headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({_captcha:'false',_template:'box',...body})}).then(async r=>{const j=await r.json().catch(()=>({}));if(/activation/i.test(j.message||''))return {activation:true};if(!r.ok||j.success==='false'||j.success===false)throw new Error(j.message||'Error '+r.status);return j});
 async function doSend(){const {list,P}=sendCtx,b=$('#sdGo');b.disabled=true;b.textContent='Enviando…';
   try{const res=await formPost(inboxMail(),{_subject:`Revisión: ${list.length} comentario(s) de ${user}`,Revisor:user,Comentarios:P.lines,Codigo:P.code});
     if(res.activation)throw new Error('el correo del diseñador aún no está activado');
@@ -860,6 +861,13 @@ $('#inTest').onclick=async()=>{const m=$('#inMail').value.trim();if(!okMail(m))r
 $('#inOk').onclick=async()=>{const m=$('#inMail').value.trim();if(!okMail(m))return toast('Escribe un correo válido');remote.inbox={email:m};
   if(!tokGet()){$('#inDlg').close();toast('Conecta GitHub para publicar este ajuste');return $('#ghDlg').showModal()}
   try{await publishConfig();$('#inDlg').close();toast('Guardado y publicado: ya se pueden recibir comentarios')}catch(e){toast('No se pudo publicar: '+ghErr(e))}};
+/* Envío automático al guardar (agrupa en 15 s y envía también al salir) */
+let autoT=null,sending=false;
+function scheduleAuto(){if(admin||!inboxMail())return;clearTimeout(autoT);autoT=setTimeout(autoSend,15000)}
+async function autoSend(){clearTimeout(autoT);if(sending||admin||!inboxMail()||!user)return;const list=pending();if(!list.length)return;
+  sending=true;try{const P=buildPayload(list),res=await formPost(inboxMail(),{_subject:`Revisión: ${list.length} comentario(s) de ${user}`,Revisor:user,Comentarios:P.lines,Codigo:P.code});
+    if(!res.activation){list.forEach(c=>sentSet.add(sig(c)));store.set('sent',[...sentSet]);updSend();toast('Enviado al diseñador ✓')}}catch{}sending=false}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')autoSend()});addEventListener('pagehide',()=>autoSend());
 /* Brillo especular que sigue al puntero (como el cristal líquido de Apple) */
 document.addEventListener('pointermove',e=>{const g=e.target.closest&&e.target.closest('#side,#panel,.bar,.dock,.card-d');if(!g)return;const r=g.getBoundingClientRect();g.style.setProperty('--mx',(e.clientX-r.left)+'px');g.style.setProperty('--my',(e.clientY-r.top)+'px')},{passive:true});
 /* ---------- Inicio ---------- */
@@ -867,7 +875,7 @@ document.addEventListener('pointermove',e=>{const g=e.target.closest&&e.target.c
 $('#oPanel').onclick=()=>document.body.classList.toggle('o-panel');
 applyZoom();showUser();setAdmin(admin);
 const q=new URLSearchParams(location.search).get('doc');
-loadRemote().then(()=>{renderDocs();renderHome();if(all().some(d=>d.id===q))openDoc(q)});
+loadRemote().then(()=>{renderDocs();renderHome();if(all().some(d=>d.id===q))openDoc(q);if(pending().length)setTimeout(autoSend,1500)});
 </script>
 </body>
 </html>
