@@ -348,6 +348,13 @@ html[data-theme=dark] .nav.sel{color:#10142a}
 body.admin #homeUp{display:none}
 #admBar{display:flex;gap:14px;flex-wrap:wrap;align-items:center}#admBar[hidden]{display:none}
 @media (max-width:860px){.search{flex:1 1 0;min-width:0}.search kbd{display:none}.hbar .sp{display:none}.hbar{gap:8px}}
+
+.sendbar{display:flex;align-items:center;gap:14px;padding:12px 18px;border-radius:16px;background:color-mix(in srgb,var(--amber) 16%,var(--surface));border:1px solid color-mix(in srgb,var(--amber) 45%,var(--line));font-size:14px}
+.sendbar span{flex:1}.sendbar[hidden]{display:none}
+.foot{flex-wrap:wrap}#sendBtn{flex:1 1 100%;justify-content:center;padding:11px}
+body.admin #sendTop,body.admin #sendBtn{display:none}
+body:not(.admin) #imp,body:not(.admin) #pasteCode{display:none}
+#pcTxt{min-height:140px;font-size:12.5px}#inMail{margin-bottom:10px}
 </style>
 </head>
 <body class="home">
@@ -370,6 +377,7 @@ body.admin #homeUp{display:none}
  </div>
  <div class="hgrid">
   <div class="hmain">
+   <div class="sendbar" id="sendBar" hidden><span>Tienes <b id="sendBarN"></b> sin enviar al diseñador.</span><button class="btn sm primary" id="sendNow">Enviar ahora</button></div>
    <div class="hero">
     <div class="hart" aria-hidden="true"><i class="a"></i><i class="b"></i><span class="badge">PDF</span></div>
     <div class="htxt">
@@ -378,7 +386,7 @@ body.admin #homeUp{display:none}
      <p>Comparte un enlace, recibe comentarios justo donde importan y aplica los cambios con calma. Todo en un solo lugar.</p>
      <div class="fchips"><span>PDF, imágenes y enlaces</span><span>Comentarios en el punto exacto</span><span>Lector tipo libro</span><span>Estados de revisión</span></div>
     </div>
-    <div class="hacts"><button class="btn" id="homeUp">Subir PDF</button><div id="admBar" hidden><div class="hbtns"><button class="btn" id="admUp">Subir PDF</button><button class="btn" id="admPub">Publicar cambios</button><button class="btn" id="admGh">GitHub</button></div><span id="admMsg"></span></div></div>
+    <div class="hacts"><button class="btn" id="homeUp">Subir PDF</button><div id="admBar" hidden><div class="hbtns"><button class="btn" id="admUp">Subir PDF</button><button class="btn" id="admPub">Publicar cambios</button><button class="btn" id="admGh">GitHub</button><button class="btn" id="admInbox">Recibir comentarios</button></div><span id="admMsg"></span></div></div>
    </div>
    <div class="panelc">
     <div class="ph"><h2>Documentos <span id="dcount"></span></h2><div class="seg" id="dseg"><button data-f="all" class="on">Todos</button><button data-f="open">Pendientes</button><button data-f="approved">Aprobados</button></div></div>
@@ -397,6 +405,7 @@ body.admin #homeUp{display:none}
  <div class="bar">
   <button class="btn mob" id="oSide">Menú</button>
   <h2 id="docTitle"></h2>
+  <button class="btn sm primary" id="sendTop">Enviar comentarios</button>
   <div class="seg" id="seg" hidden><button data-m="book">Libro</button><button data-m="doc">Documento</button></div>
   <button class="btn sm primary" id="shareBtn">Compartir</button>
   <a class="btn sm" id="openNew" target="_blank" rel="noopener">Abrir original</a>
@@ -416,13 +425,16 @@ body.admin #homeUp{display:none}
   <select id="sType" aria-label="Tipo"><option value="all">Tipo</option><option value="change">Cambio</option><option value="doubt">Duda</option><option value="ok">Todo bien</option></select>
   <select id="sStat" aria-label="Estado"><option value="all">Estado</option><option value="open">Abierto</option><option value="applied">Aplicado</option><option value="rejected">Rechazado</option></select></div>
  <div id="list"></div>
- <div class="foot"><button class="btn sm" id="exp">Exportar JSON</button><button class="btn sm" id="imp">Importar JSON</button><input type="file" id="file" accept="application/json" hidden></div>
+ <div class="foot"><button class="btn primary" id="sendBtn">Enviar comentarios</button><button class="btn sm" id="exp">Exportar JSON</button><button class="btn sm" id="imp">Importar JSON</button><button class="btn sm" id="pasteCode">Pegar código</button><input type="file" id="file" accept="application/json" hidden></div>
 </aside>
 
 <div class="ctx" id="ctx" hidden></div>
 <button id="selBtn" hidden>Comentar selección</button>
 <dialog id="nameDlg"><h2>¿Cómo te llamas?</h2><p>Tu nombre aparecerá junto a cada comentario.</p><input id="nameIn" maxlength="40" placeholder="Nombre y apellido" autocomplete="name"><div class="row"><button class="btn primary" id="nameOk">Empezar a revisar</button></div></dialog>
 <dialog id="addDlg"><h2>Añadir documento</h2><p>Sube un PDF desde tu equipo o pega un enlace.</p><button class="btn primary" id="addUp" style="width:100%;justify-content:center;margin-bottom:10px">Subir un PDF desde mi equipo</button><p style="text-align:center;margin:0 0 10px">o pega un enlace (imagen, Google Docs, Slides, Drive…)</p><input id="addT" placeholder="Título del documento"><input id="addU" placeholder="https://…" inputmode="url"><div class="row"><button class="btn" id="addNo">Cancelar</button><button class="btn primary" id="addOk">Añadir</button></div></dialog>
+<dialog id="sendDlg"><h2>Enviar comentarios</h2><p id="sdInfo"></p><p id="sdNote"></p><div class="row" style="justify-content:flex-start;flex-wrap:wrap"><button class="btn primary" id="sdGo">Enviar al diseñador</button><button class="btn" id="sdCopy">Copiar código</button><button class="btn" id="sdDl">Descargar archivo</button><button class="btn" id="sdNo" style="margin-left:auto">Cerrar</button></div><p id="sdOut" style="margin:12px 0 0;font-weight:600"></p></dialog>
+<dialog id="pcDlg"><h2>Pegar código de comentarios</h2><p>Pega el correo o el código «RV1.…» que te enviaron los revisores. Puedes pegar varios a la vez.</p><textarea id="pcTxt" placeholder="RV1.eyJjb21tZW50cyI6…~"></textarea><div class="row" style="margin-top:10px"><button class="btn" id="pcNo">Cancelar</button><button class="btn primary" id="pcOk">Importar</button></div></dialog>
+<dialog id="inDlg"><h2>Recibir comentarios</h2><p>Escribe el correo donde quieres recibir lo que envíen los revisores. Pulsa «Enviar prueba» y confirma el correo de activación de FormSubmit (revisa spam). Luego pulsa «Guardar y publicar».</p><input id="inMail" type="email" placeholder="tucorreo@ejemplo.com"><div class="row"><button class="btn" id="inTest">Enviar prueba</button><button class="btn" id="inNo">Cancelar</button><button class="btn primary" id="inOk">Guardar y publicar</button></div></dialog>
 <dialog id="shDlg"><h2>Enlace para revisar</h2><p id="shNote"></p><input id="shUrl" readonly><div class="row" style="justify-content:flex-start;flex-wrap:wrap"><button class="btn primary" id="shCopy">Copiar enlace</button><a class="btn" id="shWa" target="_blank" rel="noopener">WhatsApp</a><a class="btn" id="shMail">Correo</a><button class="btn" id="shClose" style="margin-left:auto">Cerrar</button></div></dialog>
 <dialog id="upDlg"><h2>Subir documento</h2><p>Se guarda en tu repositorio de GitHub y queda publicado en la web.</p><input type="file" id="upFile" accept="application/pdf,.pdf,image/*"><input id="upTitle" placeholder="Título del documento"><select id="upVis"><option value="public">Público</option><option value="link">Solo con enlace</option><option value="hidden">Oculto</option></select><div class="row"><button class="btn" id="upNo">Cancelar</button><button class="btn primary" id="upOk">Subir y publicar</button></div></dialog>
 <dialog id="ghDlg"><h2>Conectar con GitHub</h2><p>Para subir archivos desde la web hace falta un token. Se guarda solo en este navegador.</p><ol class="steps"><li>Abre <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a></li><li>En <b>Repository access</b> elige <i>Only select repositories</i> y marca <b>revision-documentos</b></li><li>En <b>Permissions → Contents</b> elige <i>Read and write</i></li><li>Pulsa <b>Generate token</b> y pégalo aquí</li></ol><input id="ghTok" type="password" placeholder="github_pat_…" autocomplete="off"><div class="row"><button class="btn" id="ghOff">Desconectar</button><button class="btn" id="ghNo">Cancelar</button><button class="btn primary" id="ghOk">Guardar</button></div></dialog>
@@ -465,7 +477,7 @@ const save=()=>{store.set('comments',comments);store.set('approved',approved);st
 const av=n=>{let h=0;for(const c of n||'?')h=(h*31+c.charCodeAt(0))%360;return `<span class="av" style="background:hsl(${h} 58% 50%)">${esc((n||'?')[0].toUpperCase())}</span>`};
 const ago=t=>{const m=Math.round((Date.now()-t)/6e4);return m<1?'ahora':m<60?`hace ${m} min`:m<1440?`hace ${Math.round(m/60)} h`:`hace ${Math.round(m/1440)} d`};
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3200)}
-const refresh=()=>{save();drawPins();renderPanel();renderDocs();renderHome()};
+const refresh=()=>{save();drawPins();renderPanel();renderDocs();renderHome();if(typeof updSend==='function')updSend()};
 const nOpen=id=>comments.filter(c=>c.doc===id&&c.status==='open'&&c.kind!=='ok').length;
 const statTag=id=>approved[id]?'<span class="tag appr">Aprobado</span>':nOpen(id)?`<span class="tag open">${nOpen(id)} pendiente${nOpen(id)>1?'s':''}</span>`:'<span class="tag">Sin cambios</span>';
 
@@ -487,7 +499,7 @@ function renderHome(){
    +(admin?'<div class="card-d new drop" id="newCard" role="button" tabindex="0"><svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5 4 4 0 0 1 17.5 18"/><path d="m12 12-3 3m3-3 3 3m-3-3v8"/></svg><b>Arrastra aquí un documento<br>o haz clic para subirlo</b><small>PDF, JPG, PNG…</small><a href="#" id="pasteLink">o pega un enlace</a></div>':'<button class="card-d new" id="newCard">+ Añadir enlace</button>');
   $('#dcount').textContent=list.length;
   document.querySelectorAll('#dseg button').forEach(b=>b.classList.toggle('on',b.dataset.f===dfilter));
-  showUser();renderAct();updAdm();A.forEach(d=>queueThumb(d));
+  showUser();renderAct();updAdm();updSend();A.forEach(d=>queueThumb(d));
 }
 $('#grid').addEventListener('click',e=>{
   if(e.target.closest('#pasteLink')){e.preventDefault();return $('#addDlg').showModal()}
@@ -659,13 +671,13 @@ $('#addOk').onclick=()=>{const u=$('#addU').value.trim(),t=$('#addT').value.trim
   extra.push({id:'x'+Date.now().toString(36),title:t,url:u});save();$('#addDlg').close();$('#addU').value=$('#addT').value='';renderDocs();renderHome();openDoc(extra.at(-1).id)};
 $('#exp').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({comments,approved,extra},null,2)],{type:'application/json'}));a.download='comentarios-'+new Date().toISOString().slice(0,10)+'.json';a.click();toast('Archivo exportado')};
 $('#imp').onclick=()=>$('#file').click();
+function mergeData(d){let n=0;
+  (d.comments||[]).forEach(raw=>{if(!raw||!raw.id)return;const c=norm(raw),o=comments.find(x=>x.id===c.id);
+    if(!o){comments.push(c);n++}else{if(c.status!=='open')o.status=c.status;const k=new Set(o.replies.map(r=>r.at+r.author));o.replies.push(...c.replies.filter(r=>!k.has(r.at+r.author)))}});
+  Object.assign(approved,d.approved||{});(d.extra||[]).forEach(x=>{if(!all().some(y=>y.id===x.id))extra.push(x)});return n}
 $('#file').onchange=async e=>{
   const f=e.target.files[0];if(!f)return;
-  try{const d=JSON.parse(await f.text());let n=0;
-    (d.comments||[]).forEach(raw=>{if(!raw||!raw.id)return;const c=norm(raw),o=comments.find(x=>x.id===c.id);
-      if(!o){comments.push(c);n++}else{if(c.status!=='open')o.status=c.status;const k=new Set(o.replies.map(r=>r.at+r.author));o.replies.push(...c.replies.filter(r=>!k.has(r.at+r.author)))}});
-    Object.assign(approved,d.approved||{});(d.extra||[]).forEach(x=>{if(!all().some(y=>y.id===x.id))extra.push(x)});
-    refresh();toast(n+' comentario'+(n===1?'':'s')+' nuevo'+(n===1?'':'s'))}
+  try{const n=mergeData(JSON.parse(await f.text()));refresh();toast(n+' comentario'+(n===1?'':'s')+' nuevo'+(n===1?'':'s'))}
   catch{toast('El archivo no es un JSON de comentarios válido')}
   e.target.value='';
 };
@@ -703,14 +715,14 @@ async function gh(path,method='GET',body){
 }
 const ghPut=async(path,content,msg)=>{const c=await gh(path);return gh(path,'PUT',{message:msg,content,branch:REPO.b,...(c?{sha:c.sha}:{})})};
 const ghDel=async path=>{const c=await gh(path);if(c)await gh(path,'DELETE',{message:'Eliminar '+path,sha:c.sha,branch:REPO.b})};
-async function loadRemote(){try{const r=await fetch('docs.json?t='+Date.now(),{cache:'no-store'});if(r.ok){const j=await r.json();remote={docs:j.docs||[],removed:j.removed||[]}}}catch{}}
+async function loadRemote(){try{const r=await fetch('docs.json?t='+Date.now(),{cache:'no-store'});if(r.ok){const j=await r.json();remote={docs:j.docs||[],removed:j.removed||[],inbox:j.inbox||null}}}catch{}}
 async function publishConfig(){
   const removed=[...new Set([...remote.removed,...adm.removed])];
   const gone=[...DOCS,...remote.docs].filter(d=>adm.removed.includes(d.id)&&String(d.url).startsWith('docs/'));
   const docs=allRaw().map(({id,title,raw,vis,key})=>({id,title,url:raw,vis,...(key?{key}:{})}));
-  await ghPut('docs.json',b64(JSON.stringify({docs,removed},null,2)),'Actualizar documentos');
+  await ghPut('docs.json',b64(JSON.stringify({docs,removed,...(remote.inbox?{inbox:remote.inbox}:{})},null,2)),'Actualizar documentos');
   for(const d of gone)await ghDel(d.url).catch(()=>{});
-  remote={docs,removed};adm.vis={};adm.keys={};adm.removed=[];extra=[];saveAdm();save();renderDocs();renderHome();
+  remote={docs,removed,inbox:remote.inbox};adm.vis={};adm.keys={};adm.removed=[];extra=[];saveAdm();save();renderDocs();renderHome();
 }
 function updAdm(){const dirty=!!(adm.removed.length||Object.keys(adm.vis).length||extra.length),m=$('#admMsg');
   if(m)m.textContent=dirty?'Tienes cambios sin publicar.':'Arrastra un PDF aquí o pulsa “Subir PDF”.';$('#admPub').disabled=!dirty}
@@ -808,6 +820,45 @@ document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLower
 const setTheme=t=>{document.documentElement.dataset.theme=t;store.set('theme',t);$('#themeBtn').textContent=t==='dark'?'☀':'☾'};
 $('#themeBtn').onclick=()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
 $('#usr').onclick=askName;setTheme(store.get('theme','light'));
+/* ---------- Enviar comentarios al diseñador ---------- */
+const sentSet=new Set(store.get('sent',[]));let sendCtx=null;
+const sig=c=>c.id+':'+(c.replies||[]).length;
+const pending=()=>comments.filter(c=>!sentSet.has(sig(c)));
+const inboxMail=()=>(remote.inbox&&remote.inbox.email)||'';
+const titleOf=id=>(allRaw().find(d=>d.id===id)||{}).title||id;
+function updSend(){const n=pending().length;
+  ['#sendTop','#sendBtn'].forEach(x=>{const b=$(x);if(b)b.textContent=n?`Enviar comentarios · ${n}`:'Enviar comentarios'});
+  $('#sendBar').hidden=admin||!n;$('#sendBarN').textContent=n+(n===1?' comentario':' comentarios')}
+function buildPayload(list){
+  const lines=list.map(c=>`• [${titleOf(c.doc)}${c.p?' · pág. '+(c.p+1):''}] ${KINDS[c.kind][0]}${c.status!=='open'?' ('+ST[c.status]+')':''} — ${c.author}: ${c.text}`+(c.quote?`\n    Cita: “${c.quote}”`:'')+(c.replies||[]).map(r=>`\n    ↳ ${r.author}: ${r.text}`).join('')).join('\n');
+  return {lines,code:'RV1.'+b64(JSON.stringify({comments:list}))+'~'}}
+function openSend(){
+  if(!user){toast('Primero escribe tu nombre');return askName()}
+  const list=pending().length?pending():comments;if(!list.length)return toast('Aún no has escrito comentarios');
+  sendCtx={list,P:buildPayload(list)};const nd=new Set(list.map(c=>c.doc)).size;
+  $('#sdInfo').textContent=`${list.length} comentario${list.length===1?'':'s'} en ${nd} documento${nd===1?'':'s'} listos para enviar.`;
+  $('#sdNote').textContent=inboxMail()?'Se enviarán al diseñador al pulsar el botón.':'El diseñador aún no activó el envío automático: copia el código o descarga el archivo y mándaselo.';
+  $('#sdGo').hidden=!inboxMail();$('#sdOut').textContent='';$('#sendDlg').showModal()}
+const formPost=(mail,body)=>fetch('https://formsubmit.co/ajax/'+encodeURIComponent(mail),{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({_captcha:'false',_template:'box',...body})}).then(async r=>{const j=await r.json().catch(()=>({}));if(!r.ok||j.success==='false'||j.success===false)throw new Error(j.message||'Error '+r.status);return j});
+async function doSend(){const {list,P}=sendCtx,b=$('#sdGo');b.disabled=true;b.textContent='Enviando…';
+  try{await formPost(inboxMail(),{_subject:`Revisión: ${list.length} comentario(s) de ${user}`,Revisor:user,Comentarios:P.lines,Codigo:P.code});
+    list.forEach(c=>sentSet.add(sig(c)));store.set('sent',[...sentSet]);updSend();$('#sdOut').textContent='¡Enviado! El diseñador ya puede verlos.';toast('Comentarios enviados ✓')}
+  catch(e){$('#sdOut').textContent='No se pudo enviar ('+e.message+'). Usa «Copiar código» o «Descargar archivo» y mándaselo al diseñador.'}
+  b.disabled=false;b.textContent='Enviar al diseñador'}
+$('#sendTop').onclick=$('#sendBtn').onclick=$('#sendNow').onclick=openSend;$('#sdGo').onclick=doSend;$('#sdNo').onclick=()=>$('#sendDlg').close();
+$('#sdCopy').onclick=()=>navigator.clipboard?navigator.clipboard.writeText(sendCtx.P.code).then(()=>toast('Código copiado'),()=>prompt('Copia este código:',sendCtx.P.code)):prompt('Copia este código:',sendCtx.P.code);
+$('#sdDl').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({comments:sendCtx.list},null,2)],{type:'application/json'}));a.download='comentarios-'+slug(user)+'.json';a.click()};
+$('#pasteCode').onclick=()=>{$('#pcTxt').value='';$('#pcDlg').showModal()};$('#pcNo').onclick=()=>$('#pcDlg').close();
+$('#pcOk').onclick=()=>{try{const codes=[...$('#pcTxt').value.matchAll(/RV1\.([A-Za-z0-9+\/=\s]+?)~/g)];if(!codes.length)throw 0;let n=0;
+  codes.forEach(m=>{n+=mergeData(JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/\s+/g,''))))))});$('#pcDlg').close();refresh();toast(n+' comentario'+(n===1?'':'s')+' nuevo'+(n===1?'':'s')+' importado'+(n===1?'':'s'))}
+  catch{toast('No encontré ningún código válido en el texto')}};
+$('#admInbox').onclick=()=>{$('#inMail').value=inboxMail();$('#inDlg').showModal()};$('#inNo').onclick=()=>$('#inDlg').close();
+const okMail=m=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m);
+$('#inTest').onclick=async()=>{const m=$('#inMail').value.trim();if(!okMail(m))return toast('Escribe un correo válido');
+  try{await formPost(m,{_subject:'Prueba de Revisión de documentos',Mensaje:'Si recibes este correo, confirma la activación de FormSubmit y listo.'});toast('Prueba enviada. Revisa tu correo (y spam) y confirma la activación')}catch(e){toast('No se pudo enviar la prueba: '+e.message)}};
+$('#inOk').onclick=async()=>{const m=$('#inMail').value.trim();if(!okMail(m))return toast('Escribe un correo válido');remote.inbox={email:m};
+  if(!tokGet()){$('#inDlg').close();toast('Conecta GitHub para publicar este ajuste');return $('#ghDlg').showModal()}
+  try{await publishConfig();$('#inDlg').close();toast('Guardado y publicado: ya se pueden recibir comentarios')}catch(e){toast('No se pudo publicar: '+ghErr(e))}};
 /* Brillo especular que sigue al puntero (como el cristal líquido de Apple) */
 document.addEventListener('pointermove',e=>{const g=e.target.closest&&e.target.closest('#side,#panel,.bar,.dock,.card-d');if(!g)return;const r=g.getBoundingClientRect();g.style.setProperty('--mx',(e.clientX-r.left)+'px');g.style.setProperty('--my',(e.clientY-r.top)+'px')},{passive:true});
 /* ---------- Inicio ---------- */
