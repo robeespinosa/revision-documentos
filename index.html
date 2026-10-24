@@ -839,9 +839,10 @@ function openSend(){
   $('#sdInfo').textContent=`${list.length} comentario${list.length===1?'':'s'} en ${nd} documento${nd===1?'':'s'} listos para enviar.`;
   $('#sdNote').textContent=inboxMail()?'Se enviarán al diseñador al pulsar el botón.':'El diseñador aún no activó el envío automático: copia el código o descarga el archivo y mándaselo.';
   $('#sdGo').hidden=!inboxMail();$('#sdOut').textContent='';$('#sendDlg').showModal()}
-const formPost=(mail,body)=>fetch('https://formsubmit.co/ajax/'+encodeURIComponent(mail),{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({_captcha:'false',_template:'box',...body})}).then(async r=>{const j=await r.json().catch(()=>({}));if(!r.ok||j.success==='false'||j.success===false)throw new Error(j.message||'Error '+r.status);return j});
+const formPost=(mail,body)=>fetch('https://formsubmit.co/ajax/'+encodeURIComponent(mail),{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({_captcha:'false',_template:'box',...body})}).then(async r=>{const j=await r.json().catch(()=>({}));if(/activation/i.test(j.message||''))return {activation:true};if(!r.ok||j.success==='false'||j.success===false)throw new Error(j.message||'Error '+r.status);return j});
 async function doSend(){const {list,P}=sendCtx,b=$('#sdGo');b.disabled=true;b.textContent='Enviando…';
-  try{await formPost(inboxMail(),{_subject:`Revisión: ${list.length} comentario(s) de ${user}`,Revisor:user,Comentarios:P.lines,Codigo:P.code});
+  try{const res=await formPost(inboxMail(),{_subject:`Revisión: ${list.length} comentario(s) de ${user}`,Revisor:user,Comentarios:P.lines,Codigo:P.code});
+    if(res.activation)throw new Error('el correo del diseñador aún no está activado');
     list.forEach(c=>sentSet.add(sig(c)));store.set('sent',[...sentSet]);updSend();$('#sdOut').textContent='¡Enviado! El diseñador ya puede verlos.';toast('Comentarios enviados ✓')}
   catch(e){$('#sdOut').textContent='No se pudo enviar ('+e.message+'). Usa «Copiar código» o «Descargar archivo» y mándaselo al diseñador.'}
   b.disabled=false;b.textContent='Enviar al diseñador'}
@@ -855,7 +856,7 @@ $('#pcOk').onclick=()=>{try{const codes=[...$('#pcTxt').value.matchAll(/RV1\.([A
 $('#admInbox').onclick=()=>{$('#inMail').value=inboxMail();$('#inDlg').showModal()};$('#inNo').onclick=()=>$('#inDlg').close();
 const okMail=m=>/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m);
 $('#inTest').onclick=async()=>{const m=$('#inMail').value.trim();if(!okMail(m))return toast('Escribe un correo válido');
-  try{await formPost(m,{_subject:'Prueba de Revisión de documentos',Mensaje:'Si recibes este correo, confirma la activación de FormSubmit y listo.'});toast('Prueba enviada. Revisa tu correo (y spam) y confirma la activación')}catch(e){toast('No se pudo enviar la prueba: '+e.message)}};
+  try{const res=await formPost(m,{_subject:'Prueba de Revisión de documentos',Mensaje:'Si recibes este correo, el envío funciona.'});toast(res.activation?'Te enviamos un correo de activación: ábrelo (mira spam), pulsa «Activate Form» y luego «Guardar y publicar»':'Prueba enviada: revisa tu correo. Si llegó, pulsa «Guardar y publicar»')}catch(e){toast('No se pudo enviar la prueba: '+e.message)}};
 $('#inOk').onclick=async()=>{const m=$('#inMail').value.trim();if(!okMail(m))return toast('Escribe un correo válido');remote.inbox={email:m};
   if(!tokGet()){$('#inDlg').close();toast('Conecta GitHub para publicar este ajuste');return $('#ghDlg').showModal()}
   try{await publishConfig();$('#inDlg').close();toast('Guardado y publicado: ya se pueden recibir comentarios')}catch(e){toast('No se pudo publicar: '+ghErr(e))}};
