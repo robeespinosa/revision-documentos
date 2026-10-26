@@ -6,6 +6,12 @@
       "url": "docs/catalogo-iceb-rewards-2027-ubrx.pdf",
       "vis": "link",
       "key": "2twbtoot"
+    },
+    {
+      "id": "catalogo-iceb-rewards-2027-enva",
+      "title": "Catalogo_ICEB_Rewards_2027",
+      "url": "docs/catalogo-iceb-rewards-2027-enva.pdf",
+      "vis": "public"
     }
   ],
   "removed": [
